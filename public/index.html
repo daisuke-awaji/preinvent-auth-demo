@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pre:Invent 2026 AIエージェント認証デモ</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="title">
+      <span class="logo">🔐</span>
+      <div>
+        <h1>AIエージェント認証 デモ</h1>
+        <p class="subtitle">pre:Invent 2026 — Cognito CIMD / DCR・AgentCore Gateway の JWT 条件キー・Cognito トークン交換</p>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="seg" id="mode-switch" role="group" aria-label="モード">
+        <button data-mode="mock">模擬</button>
+        <button data-mode="aws">AWS</button>
+      </div>
+      <span id="mode-label" class="mode-label"></span>
+      <button id="reset" class="ghost" title="ログイン済みトークンと模擬の状態を初期化">リセット</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="t1" class="active"><b>①</b> どのAIクライアントからでも接続</button>
+    <button role="tab" data-tab="t2"><b>②</b> 許可していないクライアントは拒否</button>
+    <button role="tab" data-tab="t3"><b>③</b> 後段 API は最小権限で</button>
+  </nav>
+
+  <div class="layout">
+    <main>
+      <section id="t1" class="tab-panel active">
+        <div class="ba">
+          <div class="before"><span class="tag">これまで</span>AIクライアントごとに管理者がアプリクライアントを作り、ID を配っていた</div>
+          <div class="arrow">→</div>
+          <div class="after"><span class="tag">これから</span>CIMD か DCR に対応したクライアントなら、事前登録なしでログインできる</div>
+        </div>
+
+        <article class="card">
+          <h2><span class="pill">CIMD</span> クライアントIDメタデータドキュメント</h2>
+          <p class="lead">AI クライアントが自分の情報を書いた JSON を HTTPS の URL で公開し、<b>その URL をクライアント ID として名乗ります</b>。Cognito 側では、受け入れる URL のパターンを CIMD ポリシーとして登録しておきます。</p>
+          <div class="policy-box">
+            <div class="row between">
+              <h3>CIMD ポリシー</h3>
+              <span class="muted small">割り当て先アプリクライアント: <code id="cimd-base"></code></span>
+            </div>
+            <label class="small muted" for="cimd-patterns">受け入れる URL パターン（1行に1つ）</label>
+            <textarea id="cimd-patterns" rows="2" spellcheck="false"></textarea>
+            <div class="row"><button id="cimd-save" class="secondary">パターンを更新</button></div>
+          </div>
+          <div class="grid2" id="cimd-docs"></div>
+          <details class="small">
+            <summary>Cognito がキャッシュしたメタデータ URL（ListClientMetadataURLs）</summary>
+            <div id="cimd-urls" class="muted"></div>
+          </details>
+        </article>
+
+        <article class="card">
+          <h2><span class="pill">DCR</span> 動的クライアント登録</h2>
+          <p class="lead">AI クライアントが登録用エンドポイントに自分の情報を送ると、<b>その場で <code>dcr_</code> で始まるクライアント ID が発行されます</b>。MCP の仕様では CIMD が推奨で、DCR は CIMD に対応していないクライアントのための方式です。</p>
+          <div class="row wrap">
+            <div class="status-box">
+              オープン登録: <b id="dcr-open-status">-</b>
+              <label class="switch" id="dcr-open-wrap" title="オープン登録の切り替え"><input type="checkbox" id="dcr-open"><span></span></label>
+            </div>
+            <code class="small" id="dcr-endpoint"></code>
+          </div>
+          <div class="row wrap">
+            <button id="dcr-register-open" class="primary">トークンなしで登録</button>
+            <button id="dcr-register-auth" class="secondary">初期アクセストークン付きで登録</button>
+            <input id="dcr-name" value="Demo MCP client (DCR)" aria-label="client_name">
+          </div>
+          <div class="callout warn">⚠️ オープン登録を有効にすると、知らない相手もクライアントを作れます。登録用トークンを必須にするか、AWS WAF でレート制限をかけましょう。</div>
+          <h3>登録したクライアント</h3>
+          <div id="dcr-list" class="list"></div>
+          <div class="row"><button id="dcr-refresh" class="ghost small">Cognito 上の DCR クライアント一覧（ListUserPoolClients）</button></div>
+          <div id="dcr-remote" class="list"></div>
+        </article>
+      </section>
+
+      <section id="t2" class="tab-panel">
+        <div class="ba">
+          <div class="before"><span class="tag">これまで</span>Gateway には、許可するクライアント ID とスコープを並べて設定するしかなかった</div>
+          <div class="arrow">→</div>
+          <div class="after"><span class="tag">これから</span>リソースポリシーで JWT のクレーム（client_id / scope / aud / sub / iss）を条件に拒否できる</div>
+        </div>
+
+        <article class="card">
+          <h2>Gateway のリソースポリシー</h2>
+          <p class="lead">条件キー <code>bedrock-agentcore:InboundJwtClaim/*</code> を使います。条件はツール単位ではなく、<b>Gateway 全体への呼び出し</b>にかかります。</p>
+          <div class="row wrap">
+            <label class="small muted" for="target-client">対象クライアント</label>
+            <select id="target-client"></select>
+          </div>
+          <div class="row wrap presets">
+            <button data-preset="allow" class="ghost">許可のみ</button>
+            <button data-preset="deny-client" class="ghost">この client_id を拒否</button>
+            <button data-preset="deny-only" class="ghost danger-ghost">Deny のみ（落とし穴）</button>
+            <button data-preset="require-scope" class="ghost">スコープ必須（おすすめ）</button>
+          </div>
+          <textarea id="policy" rows="14" spellcheck="false" class="mono"></textarea>
+          <div class="row wrap">
+            <button id="policy-apply" class="primary">適用（PutResourcePolicy）</button>
+            <button id="policy-load" class="ghost">現在のポリシーを読み込む</button>
+            <button id="policy-delete" class="ghost">削除</button>
+          </div>
+          <div class="callout warn">⚠️ Deny の文だけを置くと、条件に当たらない呼び出しまで全部 403 になります。Allow の文も一緒に置きましょう。</div>
+        </article>
+
+        <article class="card">
+          <div class="row between">
+            <h2>ログイン済みの全クライアントから呼び出し</h2>
+            <button id="matrix-run" class="primary">呼び出す（tools/list）</button>
+          </div>
+          <div id="matrix" class="matrix muted">タブ①でログインしたクライアントが並びます。</div>
+          <p class="small muted">クライアント ID が後から増える使い方では、ID を並べるより、スコープで絞るほうが楽です。</p>
+        </article>
+      </section>
+
+      <section id="t3" class="tab-panel">
+        <div class="ba">
+          <div class="before"><span class="tag">これまで</span>MCP サーバーはユーザーのトークンをそのまま後段 API に転送していた（必要以上の権限まで渡る）</div>
+          <div class="arrow">→</div>
+          <div class="after"><span class="tag">これから</span>OAuth 2.0 トークン交換（RFC 8693）で、後段 API 専用の狭いトークンに交換できる</div>
+        </div>
+
+        <article class="card">
+          <div class="row wrap">
+            <label class="small muted" for="subject-token">ユーザーのトークン（subject_token）</label>
+            <select id="subject-token"></select>
+          </div>
+          <div class="flow">
+            <div class="node">👤 ユーザー<br><span class="small muted">AIクライアント</span></div>
+            <div class="edge">ユーザーのトークン</div>
+            <div class="node">🧩 MCP サーバー<br><span class="small muted" id="mcp-client-id"></span></div>
+            <div class="edge" id="flow-edge">？</div>
+            <div class="node">🗄️ 後段 API<br><span class="small muted">aud: demo-backend</span></div>
+          </div>
+        </article>
+
+        <div class="grid2">
+          <article class="card">
+            <h2><span class="pill gray">Before</span> そのまま転送</h2>
+            <p class="small">ユーザーのトークンを、そのまま後段 API に渡します。</p>
+            <div class="row wrap">
+              <button id="forward-read" class="secondary">転送して read</button>
+              <button id="forward-write" class="ghost">転送して write</button>
+            </div>
+          </article>
+          <article class="card">
+            <h2><span class="pill">After</span> トークン交換</h2>
+            <div class="row wrap">
+              <label class="small muted" for="ex-scope">要求するスコープ</label>
+              <select id="ex-scope">
+                <option value="demo-backend/read">demo-backend/read（1つに絞る）</option>
+                <option value="demo-backend/write">demo-backend/write</option>
+                <option value="demo-backend/admin">demo-backend/admin（元のトークンにない＝拡大）</option>
+              </select>
+            </div>
+            <label class="check"><input type="checkbox" id="ex-actor" checked> actor_token を付ける（委任 → <code>act</code> クレーム）</label>
+            <div class="row"><button id="exchange" class="primary">交換する</button></div>
+          </article>
+        </div>
+
+        <article class="card">
+          <h2>交換前後の比較</h2>
+          <div id="compare" class="muted">交換すると、ここに交換前後のトークンが並びます。</div>
+          <div class="row wrap">
+            <button id="exchanged-read" class="secondary" disabled>交換後のトークンで read</button>
+            <button id="exchanged-write" class="ghost" disabled>交換後のトークンで write</button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <aside class="trace-panel">
+      <div class="row between">
+        <h2>トレース</h2>
+        <span class="small muted" id="trace-time"></span>
+      </div>
+      <div id="trace" class="trace muted">操作すると、HTTP のやり取りとデコードした JWT がここに出ます。</div>
+      <h3 class="wallet-h">ログイン済みトークン</h3>
+      <div id="wallet" class="wallet muted">まだありません</div>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -8,7 +8,9 @@ function analyze(claims, requiredScope) {
   const notes = [];
   const scopes = String(claims.scope ?? '').split(' ').filter(Boolean);
   const extra = scopes.filter((s) => s !== requiredScope);
-  if (extra.length) {
+  if (!scopes.includes(requiredScope)) {
+    notes.push({ level: 'info', text: `受け取ったスコープ: ${scopes.join(', ') || '（なし）'}` });
+  } else if (extra.length) {
     notes.push({ level: 'warn', text: `この操作に必要なのは ${requiredScope} だけですが、ほかに ${extra.length} 個のスコープ（${extra.join(', ')}）も受け取りました` });
   } else {
     notes.push({ level: 'ok', text: `必要なスコープ（${requiredScope}）だけを受け取りました` });
