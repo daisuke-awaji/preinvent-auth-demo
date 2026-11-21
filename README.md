@@ -78,6 +78,10 @@ npm run teardown:aws               # デモ後に必ず実行
 
 ## 構成
 
+![AWS 構成図](docs/architecture.png)
+
+構成図の元データは [docs/architecture.drawio](docs/architecture.drawio)（draw.io の AWS アイコンで作図）です。線の色はタブに対応しています（青: 01、ピンク: 02、緑: 03）。編集したら draw.io で PNG に書き出し、`docs/architecture.png` を置き換えてください。
+
 ```
 public/
   index.html / style.css  画面（Vercel 風のダークテーマ）
