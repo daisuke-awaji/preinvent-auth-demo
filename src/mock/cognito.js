@@ -200,7 +200,7 @@ const raw = (value) => new Raw(value);
 
 function errorPage(res, error, description) {
   res.status(400).send(html`<!doctype html><meta charset="utf-8"><title>エラー</title>
-<link rel="stylesheet" href="/mock-login.css"><main class="card"><div class="brand">模擬 Cognito マネージドログイン</div>
+<link rel="stylesheet" href="${raw(`${BASE_URL}/mock-login.css`)}"><main class="card"><div class="brand">模擬 Cognito マネージドログイン</div>
 <h1 class="err">${error}</h1><p>${description}</p><p class="hint">リダイレクトせずにエラーを表示しています（client_id か redirect_uri が信頼できないため）。</p>
 <script>window.opener&&window.opener.postMessage({type:'login-error',error:${raw(JSON.stringify(error).replace(/</g, '\\u003c'))},description:${raw(JSON.stringify(description).replace(/</g, '\\u003c'))}},location.origin)</script></main>`);
 }
@@ -261,11 +261,11 @@ export function createMockCognitoRouter() {
     state.transactions.set(txn, { client, scopes, redirectUri: q.redirect_uri, state: q.state, codeChallenge: q.code_challenge, resource: q.resource });
     const kind = { CIMD: 'CIMD（URL をクライアント ID として使用）', DCR: '動的クライアント登録（DCR）', REGULAR: '事前登録したアプリクライアント' }[client.ClientType];
     res.send(html`<!doctype html><meta charset="utf-8"><title>サインイン</title>
-<link rel="stylesheet" href="/mock-login.css"><main class="card"><div class="brand">模擬 Cognito マネージドログイン</div>
+<link rel="stylesheet" href="${raw(`${BASE_URL}/mock-login.css`)}"><main class="card"><div class="brand">模擬 Cognito マネージドログイン</div>
 <h1>サインイン</h1>
 <div class="client"><b>${client.ClientName}</b> がアクセスを求めています
 <dl><dt>種類</dt><dd>${kind}</dd><dt>client_id</dt><dd class="mono">${client.ClientId}</dd>${raw(client.MappedAppClient ? html`<dt>割り当て先</dt><dd class="mono">${client.MappedAppClient}</dd>` : '')}<dt>スコープ</dt><dd class="mono">${scopes.join(' ')}</dd></dl></div>
-<form method="post" action="${MOCK_PREFIX}/login"><input type="hidden" name="txn" value="${txn}">
+<form method="post" action="${MOCK_ISSUER}/login"><input type="hidden" name="txn" value="${txn}">
 <label>ユーザー名<input name="username" value="demo" autocomplete="off"></label>
 <label>パスワード<input name="password" type="password" value="Passw0rd!"></label>
 <button type="submit">サインイン</button></form></main>`);

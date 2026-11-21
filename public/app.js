@@ -184,7 +184,7 @@ function renderTab3() {
 }
 
 async function refresh() {
-  S = await api('/api/state');
+  S = await api('api/state');
   renderHeader();
   renderWallet();
   renderTab1();
@@ -203,7 +203,7 @@ document.querySelectorAll('.tabs button').forEach((b) =>
 document.querySelectorAll('#mode-switch button').forEach((b) =>
   b.addEventListener('click', () =>
     busy(b, async () => {
-      await api('/api/mode', { method: 'POST', body: { mode: b.dataset.mode } });
+      await api('api/mode', { method: 'POST', body: { mode: b.dataset.mode } });
       lastExchange = null;
       $('#trace').innerHTML = '操作すると、HTTP のやり取りとデコードした JWT がここに出ます。';
       await refresh();
@@ -214,7 +214,7 @@ document.querySelectorAll('#mode-switch button').forEach((b) =>
 $('#reset').addEventListener('click', (e) =>
   busy(e.currentTarget, async () => {
     if (!confirm('ログイン済みトークンと（模擬モードでは）登録内容・ポリシーを初期化します。よろしいですか？')) return;
-    await api('/api/reset', { method: 'POST' });
+    await api('api/reset', { method: 'POST' });
     lastExchange = null;
     $('#matrix').innerHTML = 'タブ①でログインしたクライアントが並びます。';
     $('#compare').innerHTML = '交換すると、ここに交換前後のトークンが並びます。';
@@ -226,14 +226,14 @@ $('#reset').addEventListener('click', (e) =>
 
 // ---- login popup
 function openLogin(client, kind, label) {
-  const url = `/api/login/start?${new URLSearchParams({ client, kind, label })}`;
+  const url = `api/login/start?${new URLSearchParams({ client, kind, label })}`;
   const win = window.open(url, `demo-login-${Date.now()}`, 'width=520,height=760');
   if (!win) toast('ポップアップがブロックされました。ブラウザで許可してください', true);
 }
 window.addEventListener('message', async (e) => {
   if (e.origin !== location.origin || !e.data?.type) return;
   if (e.data.traceId) {
-    const trace = await fetch(`/api/trace/${e.data.traceId}`).then((r) => r.json());
+    const trace = await fetch(`api/trace/${e.data.traceId}`).then((r) => r.json());
     renderTrace(trace);
   } else if (e.data.type === 'login-error') {
     renderTrace({ title: 'ログインできませんでした', steps: [], notes: [{ level: 'error', text: `${e.data.error}: ${e.data.description ?? ''}` }] });
@@ -248,7 +248,7 @@ $('#cimd-docs').addEventListener('click', (e) => {
   const login = e.target.closest('[data-login-cimd]');
   if (probe) {
     busy(probe, async () => {
-      show(await api('/api/cimd/probe', { method: 'POST', body: { key: probe.dataset.probe } }));
+      show(await api('api/cimd/probe', { method: 'POST', body: { key: probe.dataset.probe } }));
       await refresh();
     });
   }
@@ -259,26 +259,26 @@ $('#cimd-docs').addEventListener('click', (e) => {
 });
 $('#cimd-save').addEventListener('click', (e) =>
   busy(e.currentTarget, async () => {
-    show(await api('/api/cimd/patterns', { method: 'POST', body: { patterns: $('#cimd-patterns').value.split('\n') } }));
+    show(await api('api/cimd/patterns', { method: 'POST', body: { patterns: $('#cimd-patterns').value.split('\n') } }));
     await refresh();
     toast('CIMD ポリシーを更新しました');
   }),
 );
 $('#dcr-register-open').addEventListener('click', (e) =>
   busy(e.currentTarget, async () => {
-    show(await api('/api/dcr/register', { method: 'POST', body: { withToken: false, clientName: $('#dcr-name').value } }));
+    show(await api('api/dcr/register', { method: 'POST', body: { withToken: false, clientName: $('#dcr-name').value } }));
     await refresh();
   }),
 );
 $('#dcr-register-auth').addEventListener('click', (e) =>
   busy(e.currentTarget, async () => {
-    show(await api('/api/dcr/register', { method: 'POST', body: { withToken: true, clientName: $('#dcr-name').value } }));
+    show(await api('api/dcr/register', { method: 'POST', body: { withToken: true, clientName: $('#dcr-name').value } }));
     await refresh();
   }),
 );
 $('#dcr-open').addEventListener('change', async (e) => {
   try {
-    show(await api('/api/dcr/open', { method: 'POST', body: { enabled: e.target.checked } }));
+    show(await api('api/dcr/open', { method: 'POST', body: { enabled: e.target.checked } }));
   } catch (err) {
     toast(err.message, true);
   }
@@ -290,7 +290,7 @@ $('#dcr-list').addEventListener('click', (e) => {
 });
 $('#dcr-refresh').addEventListener('click', (e) => busy(e.currentTarget, loadRemoteDcr));
 async function loadRemoteDcr() {
-  const data = show(await api('/api/dcr/clients'));
+  const data = show(await api('api/dcr/clients'));
   $('#dcr-remote').innerHTML = data.clients.length
     ? data.clients.map((c) => `<div class="item"><div><code>${esc(c.ClientId)}</code> <span class="small muted">${esc(c.ClientName)}</span></div><button class="ghost small" data-del="${esc(c.ClientId)}">削除</button></div>`).join('')
     : '<span class="muted small">DCR クライアントはありません</span>';
@@ -299,7 +299,7 @@ $('#dcr-remote').addEventListener('click', (e) => {
   const b = e.target.closest('[data-del]');
   if (!b) return;
   busy(b, async () => {
-    show(await api(`/api/dcr/clients/${encodeURIComponent(b.dataset.del)}`, { method: 'DELETE' }));
+    show(await api(`api/dcr/clients/${encodeURIComponent(b.dataset.del)}`, { method: 'DELETE' }));
     await refresh();
     await loadRemoteDcr();
   });
@@ -335,7 +335,7 @@ document.querySelectorAll('[data-preset]').forEach((b) =>
 );
 async function loadPolicy(quiet = false) {
   try {
-    const { policy } = await api('/api/gateway/policy');
+    const { policy } = await api('api/gateway/policy');
     if (policy) $('#policy').value = JSON.stringify(policy, null, 2);
     else if (!$('#policy').value) $('#policy').value = JSON.stringify(preset('allow'), null, 2);
     if (!quiet) toast(policy ? '現在のポリシーを読み込みました' : 'リソースポリシーは未設定です（JWT 認証のみ）');
@@ -352,19 +352,19 @@ $('#policy-apply').addEventListener('click', (e) =>
     } catch (err) {
       throw new Error(`JSON が不正です: ${err.message}`);
     }
-    show(await api('/api/gateway/policy', { method: 'PUT', body: { policy } }));
+    show(await api('api/gateway/policy', { method: 'PUT', body: { policy } }));
     toast('ポリシーを適用しました');
   }),
 );
 $('#policy-delete').addEventListener('click', (e) =>
   busy(e.currentTarget, async () => {
-    show(await api('/api/gateway/policy', { method: 'DELETE' }));
+    show(await api('api/gateway/policy', { method: 'DELETE' }));
     toast('ポリシーを削除しました');
   }),
 );
 $('#matrix-run').addEventListener('click', (e) =>
   busy(e.currentTarget, async () => {
-    const data = show(await api('/api/gateway/matrix', { method: 'POST' }));
+    const data = show(await api('api/gateway/matrix', { method: 'POST' }));
     if (!data.rows.length) {
       $('#matrix').innerHTML = 'ログイン済みのクライアントがありません。タブ①でログインしてください。';
       return;
@@ -396,19 +396,19 @@ for (const op of ['read', 'write']) {
     busy(e.currentTarget, async () => {
       const w = S.wallet.find((x) => x.id === subjectId());
       setEdge(`ユーザーのトークンそのまま（scope ${String(w.claims?.scope ?? '').split(' ').length} 個）`, 'wide');
-      show(await api('/api/exchange/forward', { method: 'POST', body: { walletId: w.id, op } }));
+      show(await api('api/exchange/forward', { method: 'POST', body: { walletId: w.id, op } }));
     }),
   );
   $(`#exchanged-${op}`).addEventListener('click', (e) =>
     busy(e.currentTarget, async () => {
-      show(await api('/api/backend/call', { method: 'POST', body: { walletId: lastExchange.issuedId, op } }));
+      show(await api('api/backend/call', { method: 'POST', body: { walletId: lastExchange.issuedId, op } }));
     }),
   );
 }
 $('#exchange').addEventListener('click', (e) =>
   busy(e.currentTarget, async () => {
     const id = subjectId();
-    const data = show(await api('/api/exchange/exchange', { method: 'POST', body: { walletId: id, scope: $('#ex-scope').value, withActor: $('#ex-actor').checked } }));
+    const data = show(await api('api/exchange/exchange', { method: 'POST', body: { walletId: id, scope: $('#ex-scope').value, withActor: $('#ex-actor').checked } }));
     await refresh();
     if (!data.walletId) {
       setEdge('交換は拒否されました', 'wide');
