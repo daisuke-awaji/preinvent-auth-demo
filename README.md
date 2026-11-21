@@ -2,13 +2,17 @@
 
 [【pre:Inventまとめ】AWSのAIエージェント認証がいろいろ進化！](https://qiita.com/minorun365/items/bd6091f2599a0f37326b) の3つのアップデートを、1つの画面（3タブ）で順にデモするアプリです。
 
+**ブラウザだけで試す: https://daisuke-awaji.github.io/preinvent-auth-demo/** （GitHub Pages。バックエンドはブラウザ内の模擬実装）
+
+![画面](docs/screenshots/0-top.png)
+
 | タブ | アップデート | 見せること |
 |---|---|---|
-| ① どのAIクライアントからでも接続 | Cognito **CIMD** / **DCR** | URL をクライアント ID として名乗ってログイン（`client_id` に URL が入る）、未許可の URL は拒否。DCR で `dcr_` クライアントが発行され、オープン登録を切ると 401 |
-| ② 許可していないクライアントは拒否 | AgentCore Gateway の `bedrock-agentcore:InboundJwtClaim/*` 条件キー | 特定 `client_id` だけ 403。**Deny だけ置くと全部 403** の落とし穴。スコープ必須のおすすめ形 |
-| ③ 後段APIは最小権限で | Cognito **トークン交換（RFC 8693）** | 転送（Before）と交換（After）の比較。スコープ 4→1、`aud`、`act`、リフレッシュトークンなし、スコープ拡大は 400 |
+| 01 どのAIクライアントからでも接続 | Cognito **CIMD** / **DCR** | URL をクライアント ID として名乗ってログイン（`client_id` に URL が入る）、未許可の URL は拒否。DCR で `dcr_` クライアントが発行され、オープン登録を切ると 401 |
+| 02 許可していないクライアントは拒否 | AgentCore Gateway の `bedrock-agentcore:InboundJwtClaim/*` 条件キー | 特定 `client_id` だけ 403。**Deny だけ置くと全部 403** の落とし穴。スコープ必須のおすすめ形 |
+| 03 後段APIは最小権限で | Cognito **トークン交換（RFC 8693）** | 転送（Before）と交換（After）の比較。スコープ 4→1、`aud`、`act`、リフレッシュトークンなし、スコープ拡大は 400 |
 
-右側の「トレース」に、HTTP のやり取りとデコードした JWT（`client_id` / `scope` / `aud` / `act` を強調）が出ます。トークン本体はサーバー側に置き、ブラウザにはデコード結果だけを返します。
+画面上部の AWS 構成図は、選んだタブに関係する経路を色付きで示し、操作するとその呼び出しが通った経路が光ります（Gateway や後段 API で 403 になると赤く表示）。右側の「トレース」には、HTTP のやり取りとデコードした JWT（`client_id` / `scope` / `aud` / `act` を強調）が出ます。ローカル版では、トークン本体はサーバー側に置き、ブラウザにはデコード結果だけを返します。
 
 ## 使い方
 
@@ -18,7 +22,21 @@ npm start            # http://localhost:3000
 npm test             # 模擬モードの全フローとポリシー評価のテスト
 ```
 
-### 2つのモード
+### GitHub Pages 版（ブラウザ内の模擬バックエンド）
+
+`main` に push すると GitHub Actions（`.github/workflows/pages.yml`）がテストとビルドを行い、GitHub Pages に公開します。
+
+- `npm run build:pages` で `dist/` を作ります。サーバー側のコード（`src/routes.js`・`src/mock/*`・`src/backend.js`）を esbuild でそのままブラウザ向けにまとめ、`express` と `node:crypto` などは `src/browser/` の小さな代替実装に差し替えます。
+- ページ内の `fetch` は、`api/`・`mock/`・`backend/`・`cimd/`・`callback` へのリクエストをブラウザ内の模擬バックエンドで処理します。
+- ログインのポップアップ（画面遷移やフォーム送信）は Service Worker（`sw.js`）が受け取り、開いているデモのページに転送して処理します。状態はデモのページのメモリにあり、再読み込みすると初期化されます。
+- 鍵・トークンはブラウザ内で作る模擬のものです。AWS モードはローカル版だけです。
+
+```bash
+npm run build:pages
+npm run preview:pages   # http://localhost:4000/preinvent-auth-demo/（Pages と同じサブパスで配信）
+```
+
+### 2つのモード（ローカル版）
 
 画面右上で切り替えます。
 
@@ -61,6 +79,11 @@ npm run teardown:aws               # デモ後に必ず実行
 ## 構成
 
 ```
+public/
+  index.html / style.css  画面（Vercel 風のダークテーマ）
+  app.js               画面の処理
+  arch.js              AWS 構成図（公式アイコン、タブ連動のハイライト、トレースに合わせた発光）
+  icons/aws/           AWS Architecture Icons（一部を暗い背景向けに白く着色）
 src/
   server.js            Express（127.0.0.1 で待ち受け）
   routes.js            画面用 API・ログイン（認可コード＋PKCE、ポップアップ）・トークン置き場
@@ -70,8 +93,10 @@ src/
   mock/cognito.js      模擬 Cognito（CIMD / DCR / client_credentials / token-exchange）
   mock/gateway.js      模擬 AgentCore Gateway（JWT 検証 → リソースポリシー → MCP 応答）
   providers/           mock / aws の切り替え（管理系の操作だけが違い、OAuth のやり取りは同じコード）
+  browser/             GitHub Pages 用（express・crypto・Buffer の代替、ランタイム、Service Worker）
 scripts/
   setup-aws.js / teardown-aws.js
+  build-pages.js / preview-pages.js
 ```
 
 ## 画面
@@ -79,6 +104,9 @@ scripts/
 ![CIMD でログイン](docs/screenshots/1-cimd-login.png)
 ![Gateway のリソースポリシー](docs/screenshots/2-gateway-deny.png)
 ![トークン交換](docs/screenshots/3-token-exchange.png)
+![模擬マネージドログイン](docs/screenshots/0-mock-login.png)
+
+構成図のアイコンは [AWS Architecture Icons](https://aws.amazon.com/architecture/icons/) を使っています（[aws-icons](https://www.npmjs.com/package/aws-icons) パッケージから取得）。
 
 ## 参考
 

@@ -161,7 +161,7 @@ export function createAppRouter({ providers, initialMode }) {
 
   r.get('/callback', async (req, res) => {
     const pending = s().pending.get(String(req.query.state ?? ''));
-    const finish = (msg) => res.send(`<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:2rem">${msg.type === 'login-complete' ? 'ログインしました。このウィンドウは閉じて構いません。' : 'ログインに失敗しました。'}<script>window.opener&&window.opener.postMessage(${JSON.stringify(msg).replace(/</g, '\\u003c')},location.origin);setTimeout(()=>window.close(),600)</script>`);
+    const finish = (msg) => res.send(`<!doctype html><meta charset="utf-8"><body style="font-family:Geist,system-ui,sans-serif;background:#000;color:#ededed;padding:2rem">${msg.type === 'login-complete' ? 'ログインしました。このウィンドウは閉じて構いません。' : 'ログインに失敗しました。'}<script>window.opener&&window.opener.postMessage(${JSON.stringify(msg).replace(/</g, '\\u003c')},location.origin);setTimeout(()=>window.close(),600)</script>`);
     if (!pending) return finish({ type: 'login-error', error: 'invalid_state', description: 'state が一致しません' });
     s().pending.delete(String(req.query.state));
     const { trace } = pending;
@@ -306,7 +306,7 @@ export function createAppRouter({ providers, initialMode }) {
         message: r2.status === 200 ? 'OK' : r2.body?.message ?? r2.body?.error ?? '',
       });
     }
-    if (!rows.length) trace.note('info', 'ログイン済みのトークンがありません。タブ①でログインしてください');
+    if (!rows.length) trace.note('info', 'ログイン済みのトークンがありません。タブ 01でログインしてください');
     res.json({ traceId: saveTrace(trace), trace: trace.toJSON(), rows });
   }));
 

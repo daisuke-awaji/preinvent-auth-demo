@@ -1,3 +1,5 @@
+import { mountArch, pulseArch, setArchTab } from './arch.js';
+
 const $ = (sel) => document.querySelector(sel);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 let S = null;
@@ -85,6 +87,7 @@ function renderTrace(trace) {
     })
     .join('');
   $('#trace').classList.remove('muted');
+  pulseArch($('#arch'), trace);
   $('#trace').innerHTML = `<div class="trace-title">${esc(trace.title)}</div><div class="notes">${notes}</div>${steps}`;
 }
 
@@ -100,10 +103,10 @@ function renderHeader() {
   document.querySelectorAll('#mode-switch button').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === S.mode);
     b.disabled = !S.availableModes.includes(b.dataset.mode);
-    if (b.disabled) b.title = 'aws-config.json がありません（npm run setup:aws）';
+    if (b.disabled) b.title = S.capabilities.staticSite ? 'GitHub Pages 版は模擬モードだけです（AWS モードはローカルで npm start）' : 'aws-config.json がありません（npm run setup:aws）';
   });
   $('#mode-label').textContent = S.label;
-  $('#login-hint').textContent = `🔑 ${S.loginHint}`;
+  $('#login-hint').textContent = S.loginHint;
   const errs = S.described?.errors ?? [];
   if (errs.length) toast(`AWS の状態を取得できませんでした: ${errs[0]}`, true);
 }
@@ -133,7 +136,7 @@ function renderTab1() {
       return `<div class="doc-card ${esc(d.key)}">
         <b>${esc(d.name)}</b>
         <code class="url">${esc(d.url)}</code>
-        <span class="small">${match ? '✅ CIMD ポリシーの URL パターンに一致' : '⛔ どの URL パターンにも一致しない'}</span>
+        <span class="small">${match ? '<span class="state ok">CIMD ポリシーの URL パターンに一致</span>' : '<span class="state err">どの URL パターンにも一致しない</span>'}</span>
         <div class="row wrap">
           <button class="ghost" data-probe="${esc(d.key)}">メタデータと認可を確認</button>
           <button class="primary" data-login-cimd="${esc(d.key)}">この URL でログイン</button>
@@ -166,7 +169,7 @@ function renderTab2() {
   const users = userTokens();
   sel.innerHTML = users.length
     ? users.map((w) => `<option value="${esc(w.claims?.client_id)}">${esc(w.label)} — ${esc(w.claims?.client_id)}</option>`).join('')
-    : '<option value="example-client-id">（タブ①でログインしてください）</option>';
+    : '<option value="example-client-id">（タブ 01でログインしてください）</option>';
   if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
 }
 
@@ -176,7 +179,7 @@ function renderTab3() {
   const users = userTokens();
   sel.innerHTML = users.length
     ? users.map((w) => `<option value="${esc(w.id)}">${esc(w.label)}（scope ${String(w.claims?.scope ?? '').split(' ').length} 個）</option>`).join('')
-    : '<option value="">（タブ①でログインしてください）</option>';
+    : '<option value="">（タブ 01でログインしてください）</option>';
   if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
   $('#mcp-client-id').textContent = S.clients.mcpServer;
   $('#exchanged-read').disabled = !lastExchange;
@@ -197,6 +200,7 @@ document.querySelectorAll('.tabs button').forEach((b) =>
   b.addEventListener('click', () => {
     document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('active', x === b));
     document.querySelectorAll('.tab-panel').forEach((p) => p.classList.toggle('active', p.id === b.dataset.tab));
+    setArchTab($('#arch'), b.dataset.tab);
     if (b.dataset.tab === 't2') loadPolicy(true);
   }),
 );
@@ -216,7 +220,7 @@ $('#reset').addEventListener('click', (e) =>
     if (!confirm('ログイン済みトークンと（模擬モードでは）登録内容・ポリシーを初期化します。よろしいですか？')) return;
     await api('api/reset', { method: 'POST' });
     lastExchange = null;
-    $('#matrix').innerHTML = 'タブ①でログインしたクライアントが並びます。';
+    $('#matrix').innerHTML = 'タブ 01でログインしたクライアントが並びます。';
     $('#compare').innerHTML = '交換すると、ここに交換前後のトークンが並びます。';
     await refresh();
     await loadPolicy(true);
@@ -366,7 +370,7 @@ $('#matrix-run').addEventListener('click', (e) =>
   busy(e.currentTarget, async () => {
     const data = show(await api('api/gateway/matrix', { method: 'POST' }));
     if (!data.rows.length) {
-      $('#matrix').innerHTML = 'ログイン済みのクライアントがありません。タブ①でログインしてください。';
+      $('#matrix').innerHTML = 'ログイン済みのクライアントがありません。タブ 01でログインしてください。';
       return;
     }
     $('#matrix').classList.remove('muted');
@@ -383,7 +387,7 @@ $('#matrix-run').addEventListener('click', (e) =>
 // ---- tab 3
 const subjectId = () => {
   const id = $('#subject-token').value;
-  if (!id) throw new Error('タブ①でログインしてトークンを用意してください');
+  if (!id) throw new Error('タブ 01でログインしてトークンを用意してください');
   return id;
 };
 function setEdge(text, cls) {
@@ -395,7 +399,7 @@ for (const op of ['read', 'write']) {
   $(`#forward-${op}`).addEventListener('click', (e) =>
     busy(e.currentTarget, async () => {
       const w = S.wallet.find((x) => x.id === subjectId());
-      setEdge(`ユーザーのトークンそのまま（scope ${String(w.claims?.scope ?? '').split(' ').length} 個）`, 'wide');
+      setEdge(`そのまま転送（scope ${String(w.claims?.scope ?? '').split(' ').length} 個）`, 'wide');
       show(await api('api/exchange/forward', { method: 'POST', body: { walletId: w.id, op } }));
     }),
   );
@@ -439,9 +443,11 @@ function renderCompare() {
   $('#compare').innerHTML = `<div class="compare"><table><thead><tr><th>クレーム</th><th>交換前（ユーザーのトークン）</th><th>交換後（後段 API 用）</th></tr></thead><tbody>${rows
     .map(([k, x, y]) => `<tr class="${JSON.stringify(x) !== JSON.stringify(y) ? 'changed' : ''}"><th>${esc(k)}</th><td>${fmt(x)}</td><td>${fmt(y)}</td></tr>`)
     .join('')}</tbody></table></div>`;
-  setEdge(`交換後のトークン（scope ${String(a.scope ?? '').split(' ').length} 個・aud=${a.aud}）`, 'narrow');
+  setEdge(`交換後（scope ${String(a.scope ?? '').split(' ').length} 個・aud=${a.aud}）`, 'narrow');
 }
 
+mountArch($('#arch'));
+setArchTab($('#arch'), 't1');
 refresh()
   .then(() => loadPolicy(true))
   .catch((err) => toast(err.message, true));
