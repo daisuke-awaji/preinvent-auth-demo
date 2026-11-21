@@ -103,6 +103,7 @@ function renderHeader() {
     if (b.disabled) b.title = 'aws-config.json がありません（npm run setup:aws）';
   });
   $('#mode-label').textContent = S.label;
+  $('#login-hint').textContent = `🔑 ${S.loginHint}`;
   const errs = S.described?.errors ?? [];
   if (errs.length) toast(`AWS の状態を取得できませんでした: ${errs[0]}`, true);
 }

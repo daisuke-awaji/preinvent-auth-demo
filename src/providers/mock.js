@@ -11,6 +11,7 @@ export function createMockProvider() {
   return {
     mode: 'mock',
     label: '模擬モード（ローカル）',
+    loginHint: 'テストユーザー demo / Passw0rd!（ログイン画面に入力済み）',
     endpoints: {
       issuer: MOCK_ISSUER,
       discovery: `${MOCK_ISSUER}/.well-known/openid-configuration`,

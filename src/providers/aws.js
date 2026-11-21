@@ -37,6 +37,7 @@ export function createAwsProvider(cfg) {
   return {
     mode: 'aws',
     label: `AWS モード（${cfg.region} / ${cfg.userPoolId}）`,
+    loginHint: `テストユーザー ${cfg.user?.username ?? 'demo'}（パスワードは aws-config.json の user.password）`,
     endpoints: {
       issuer,
       discovery: `${issuer}/.well-known/openid-configuration`,

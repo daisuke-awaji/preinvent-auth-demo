@@ -73,6 +73,7 @@ export function createAppRouter({ providers, initialMode }) {
     res.json({
       mode,
       label: prov.label,
+      loginHint: prov.loginHint,
       availableModes: Object.keys(providers),
       endpoints: prov.endpoints,
       clients: { cimdBase: prov.clients.cimdBase, registrar: prov.clients.registrar.id, mcpServer: prov.clients.mcpServer.id },
@@ -160,7 +161,7 @@ export function createAppRouter({ providers, initialMode }) {
 
   r.get('/callback', async (req, res) => {
     const pending = s().pending.get(String(req.query.state ?? ''));
-    const finish = (msg) => res.send(`<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:2rem">${msg.type === 'login-complete' ? 'ログインしました。このウィンドウは閉じて構いません。' : 'ログインに失敗しました。'}<script>window.opener&&window.opener.postMessage(${JSON.stringify(msg).replace(/</g, '\\u003c')},'*');setTimeout(()=>window.close(),600)</script>`);
+    const finish = (msg) => res.send(`<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:2rem">${msg.type === 'login-complete' ? 'ログインしました。このウィンドウは閉じて構いません。' : 'ログインに失敗しました。'}<script>window.opener&&window.opener.postMessage(${JSON.stringify(msg).replace(/</g, '\\u003c')},location.origin);setTimeout(()=>window.close(),600)</script>`);
     if (!pending) return finish({ type: 'login-error', error: 'invalid_state', description: 'state が一致しません' });
     s().pending.delete(String(req.query.state));
     const { trace } = pending;

@@ -202,7 +202,7 @@ function errorPage(res, error, description) {
   res.status(400).send(html`<!doctype html><meta charset="utf-8"><title>エラー</title>
 <link rel="stylesheet" href="/mock-login.css"><main class="card"><div class="brand">模擬 Cognito マネージドログイン</div>
 <h1 class="err">${error}</h1><p>${description}</p><p class="hint">リダイレクトせずにエラーを表示しています（client_id か redirect_uri が信頼できないため）。</p>
-<script>window.opener&&window.opener.postMessage({type:'login-error',error:${raw(JSON.stringify(error).replace(/</g, '\\u003c'))},description:${raw(JSON.stringify(description).replace(/</g, '\\u003c'))}},'*')</script></main>`);
+<script>window.opener&&window.opener.postMessage({type:'login-error',error:${raw(JSON.stringify(error).replace(/</g, '\\u003c'))},description:${raw(JSON.stringify(description).replace(/</g, '\\u003c'))}},location.origin)</script></main>`);
 }
 
 function redirectError(res, redirectUri, stateParam, error, description) {

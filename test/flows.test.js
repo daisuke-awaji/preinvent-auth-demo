@@ -31,7 +31,7 @@ async function popupLogin(clientId, kind, label) {
   assert.equal(res.status, 302);
   res = await fetch(res.headers.get('location'), { redirect: 'manual' });
   const cb = await res.text();
-  const msg = JSON.parse(/postMessage\((\{.*?\}),'\*'\)/.exec(cb)[1].replace(/\\u003c/g, '<'));
+  const msg = JSON.parse(/postMessage\((\{.*?\}),location.origin\)/.exec(cb)[1].replace(/\\u003c/g, '<'));
   return { ok: msg.type === 'login-complete', msg };
 }
 
